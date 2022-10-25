@@ -9,4 +9,4 @@ The code you'll learn can be used for producing many types of phylogenetic trees
 
 Presenter: PhD candidate Ben Walker
 
-Presenter Bio: Ben is an evolutionary ecologist who studies how animals make sounds (edited) 
+Presenter Bio: Ben is an evolutionary ecologist who studies how animals make sounds 
