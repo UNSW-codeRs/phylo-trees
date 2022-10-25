@@ -8,4 +8,5 @@ This workshop will:
 The code you'll learn can be used for producing many types of phylogenetic trees,  with any numerical species trait
 
 Presenter: PhD candidate Ben Walker
+
 Presenter Bio: Ben is an evolutionary ecologist who studies how animals make sounds (edited) 
