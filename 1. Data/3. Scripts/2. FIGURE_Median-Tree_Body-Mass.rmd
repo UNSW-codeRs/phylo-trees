@@ -1,0 +1,435 @@
+---
+title: "2. FIGURE_Median_Tree_Body-Mass"
+author: "Ben JJ Walker"
+date: "07/11/2022"
+output:
+  html_document: default
+---
+
+# 1. Packages to Read:
+
+These are all the packages we need to read in so that our script works. Some of them are developer versions, so I've included the code to find them from the developers. 
+
+```{r 1. Packages, message=FALSE, warning=FALSE, results=FALSE}
+
+# Data Manipulation Packages
+library(devtools) # required
+library(tidyverse) # required
+library(geiger) # -> for tree rescaling
+
+# PGLS Tree Packages -> CHECK THESE
+library(rotl) # required
+library(ggplot2) # required
+#devtools::install_github("liamrevell/phytools")
+library(phytools) # required
+#install_github("guangchuangyu/ggtree")
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#  install.packages("BiocManager")
+#BiocManager::install("ggtree")
+library(ggtree) # required
+library(treeio) # under ggtree # required
+
+library("gridExtra") # required 
+library("ggpubr") # required
+
+library(jtools) # required
+
+```
+
+
+# 2. Making the Phylogenetic Tree:
+
+In this script we are taking the induced tree we made, and mapping trait data to it using a fast ancestral state reconstruction. I explain this more below, but you are essentially working out the values at particular bits of the tree, and then maping the colours from your colour gradient to those values. This is where things start to get pretty!
+
+Below are two ways to read in your tree that you made previously. The first way is reading the actual string output copied by hand from the .txt file. The other way is reading the file directly. Sometimes one or the other code doesn't work, hence why they're both here. Just choose one and go on if they're okay for you!
+
+```{r 2. Phylogenetic Tree}
+
+final.tree <- ape::read.tree(text='((((((((((((Martes_pennanti:9.7,(((Martes_foina:2.6,(Martes_americana:1.85931,(Martes_martes:1.11862,Martes_zibellina:1.11862)n17:0.74069)n16:0.74069)n15:5.1,Martes_flavigula:7.7)n14:1.400001,Gulo_gulo:9.1)n13:0.599999)n12:1.064753,Eira_barbara:10.764752)n11:2.417624,(Meles_meles:4.35889,Arctonyx_collaris:4.35889)n18:8.823486)n10:2.417624,((((((((Aonyx_capensis:3.103659,Lutrogale_perspicillata:3.103659)n26:1.09634,Lutra_lutra:4.2)n25:2.267755,(Enhydra_lutris:3.233877,Hydrictis_maculicollis:3.233877)n27:3.233877)n24:0.269391,(Lontra_canadensis:3.007348,(Lontra_longicaudis:1.4,Lontra_felina:1.4)n29:1.607348)n28:3.729798)n23:1.962854,Pteronura_brasiliensis:8.7)n22:2.2,(((Mustela_erminea:4.366667,((Mustela_altaica:4.1,Mustela_nivalis:4.1)n34:0.133333,(Mustela_sibirica:2.027966,(Mustela_lutreola:1.86,(Mustela_nigripes:1.623461,(Mustela_eversmannii:1.386922,Mustela_putorius:1.386922)n38:0.236539)n37:0.236539)n36:0.167966)n35:2.205367)n33:0.133334)n32:0.133333,Mustela_nudipes:4.5)n31:4.6,Mustela_frenata:9.1)n30:1.799999)n21:1.8,((Ictonyx_libyca:7.45,(Ictonyx_striatus:3.725,Poecilogale_albinucha:3.725)n41:3.725)n40:1.25,Vormela_peregusna:8.7)n39:4)n20:1.45,(Melogale_moschata:10.8,Melogale_personata:10.8)n42:3.349999)n19:1.45)n9:3.050001,Mellivora_capensis:18.650002)n8:3.05,Taxidea_taxus:21.700001)n7:9.15,((((Procyon_lotor:2.8,Procyon_cancrivorus:2.8)n46:12.64626,(Bassariscus_astutus:6.649911,Bassariscus_sumichrasti:6.649911)n47:8.79635)n45:1.437122,((Nasua_nasua:5.5,Nasua_narica:5.5)n49:5.691691,Bassaricyon_gabbii:11.191691)n48:5.691691)n44:7.116617,Potos_flavus:24)n43:6.85)n6:0.80335,Ailurus_fulgens:31.653351)n5:0.803351,(((Mephitis_mephitis:3.3,Mephitis_macroura:3.3)n52:6.849999,Spilogale_putorius:10.15)n51:4.5,(Conepatus_leuconotus:11.25,Conepatus_humboldtii:11.25)n53:3.4)n50:17.806704)n4:15.043297,((((((Ursus_maritimus:1.1,Ursus_arctos:1.1)n59:5.144673,((Ursus_thibetanus:5.246043,Ursus_americanus:5.246043)n61:0.903146,Helarctos_malayanus:6.149189)n60:0.095484)n58:0.755327,Melursus_ursinus:7)n57:9.700001,Tremarctos_ornatus:16.700001)n56:7.768742,Ailuropoda_melanoleuca:24.468742)n55:11.781258,((((((((Pusa_caspica:2.25,(Pusa_hispida:1.125,Pusa_sibirica:1.125)n70:1.125)n69:0.1,(Phoca_vitulina:1.3,Phoca_largha:1.3)n71:1.05)n68:0.1,Halichoerus_grypus:2.45)n67:4.35,(Phoca_groenlandica:4.5,Phoca_fasciata:4.5)n72:2.3)n66:1.5,Cystophora_cristata:8.3)n65:5.55,Erignathus_barbatus:13.85)n64:3.1,((((Leptonychotes_weddellii:4.638987,Hydrurga_leptonyx:4.638987)n76:2.47402,(Lobodon_carcinophaga:3.556503,Ommatophoca_rossii:3.556503)n77:3.556503)n75:3.436994,(Mirounga_angustirostris:2.441509,Mirounga_leonina:2.441509)n78:8.108491)n74:1.349999,Monachus_monachus:11.9)n73:5.050001)n63:8.049999,(((((Zalophus_californianus:4.55,Eumetopias_jubatus:4.55)n83:1.0225,((Arctocephalus_pusillus:5.05,((((Arctocephalus_forsteri:1.337207,(Arctocephalus_galapagoensis:0.8,Arctocephalus_australis:0.8)n90:0.537207)n89:0.856397,(Arctocephalus_tropicalis:0.15,Arctocephalus_gazella:0.15)n91:2.043603)n88:0.856396,(Arctocephalus_philippii:0.4,Arctocephalus_townsendi:0.4)n92:2.65)n87:1.65,Phocarctos_hookeri:4.7)n86:0.35)n85:0.1,Otaria_byronia:5.15)n84:0.4225)n82:0.4225,Neophoca_cinerea:5.995)n81:2.605,Callorhinus_ursinus:8.6)n80:11.949999,Odobenus_rosmarus:20.549999)n79:4.450001)n62:11.25)n54:11.25)n3:11.700001,((((Canis_lupus:5.65299,((Speothos_venaticus:5.458969,Lycaon_pictus:5.458969)n98:0.09701,Cuon_alpinus:5.555979)n97:0.097011)n96:0.09701,(Canis_latrans:2,Canis_aureus:2)n99:3.75)n95:1.65,((Vulpes_ferrilata:6.6,((Lycalopex_culpaeus:1.428146,Lycalopex_gymnocercus:1.428146)n103:1.171854,Lycalopex_vetulus:2.6)n102:4)n101:0.4,Chrysocyon_brachyurus:7)n100:0.4,(Canis_mesomelas:3,Canis_adustus:3)n104:4.4,Cerdocyon_thous:7.4)n94:6.4,((Nyctereutes_procyonoides:9.85,((((Vulpes_velox:2.275,Vulpes_lagopus:2.275)n110:2.701167,((Vulpes_rueppellii:1.1,Vulpes_vulpes:1.1)n112:3.725,(Vulpes_corsac:4.3,Vulpes_bengalensis:4.3)n113:0.525)n111:0.151167)n109:0.361808,(Vulpes_zerda:2.2,Vulpes_cana:2.2)n114:3.137975)n108:1.762024,(Vulpes_chama:3.65,Vulpes_pallida:3.65)n115:3.45)n107:2.75)n106:2.75,((Urocyon_cinereoargenteus:1.9,Urocyon_littoralis:1.9)n117:5.35,Otocyon_megalotis:7.25)n116:5.35)n105:1.2)n93:45.400002)n2:5.700001,((((((((((Helogale_parvula:3.761667,Dologale_dybowskii:3.761667)n127:3.761667,(Crossarchus_alexandri:4.346667,Crossarchus_obscurus:4.346667)n128:3.176667)n126:3.176666,Mungos_mungo:10.7)n125:1.5,Suricata_suricatta:12.2)n124:4.016946,(((Herpestes_urva:8.863333,Herpestes_brachyurus:8.863333)n131:6.073333,(Herpestes_smithii:7.468333,Urva_javanica:7.468333)n132:7.468333)n130:0.463334,(((Ichneumia_albicauda:14.14,(((Cynictis_penicillata:4.7,Paracynictis_selousi:4.7)n138:8.6,(Bdeogale_crassicauda:5.01,Bdeogale_nigripes:5.01)n139:8.29)n137:0.42,Rhynchogale_melleri:13.72)n136:0.42)n135:0.419999,(Herpestes_ichneumon:13.206667,(Galerella_pulverulenta:11.853333,Galerella_sanguinea:11.853333)n141:1.353333)n140:1.353333)n134:0.42,(Herpestes_vitticollis:7.49,Atilax_paludinosus:7.49)n142:7.49)n133:0.42)n129:0.816946)n123:10.428169,(((Galidia_elegans:12.476667,(Mungotictis_decemlineata:9.725,(Galidictis_fasciata:5.1,Galidictis_grandidieri:5.1)n147:4.625)n146:2.751667)n145:5.561666,(Fossa_fossana:9.3,Eupleres_goudotii:9.3)n148:8.738334)n144:5.561666,Cryptoprocta_ferox:23.6)n143:3.045115)n122:6.261372,(((Hyaena_hyaena:6.3425,Parahyaena_brunnea:6.3425)n151:2.5875,Crocuta_crocuta:8.93)n150:11.988243,Proteles_cristata:20.918243)n149:11.988243)n121:0.793514,(((((Genetta_genetta:6.8,Genetta_tigrina:6.8)n156:0.4,(Genetta_cristata:4.060833,(Genetta_servalina:2.030417,Osbornictis_piscivora:2.030417)n158:2.030417)n157:3.139166)n155:6.6,Poiana_richardsonii:13.8)n154:8.3,(Viverricula_indica:12.2,((Viverra_tangalunga:4.1,Viverra_zibetha:4.1)n161:4.05,Civettictis_civetta:8.15)n160:4.05)n159:9.900001)n153:2.199999,(((Cynogale_bennettii:12.4,Hemigalus_derbyanus:12.4)n164:2.8,(((Paradoxurus_hermaphroditus:8.2,(Paradoxurus_jerdoni:5.2,Paradoxurus_zeylonensis:5.2)n168:3)n167:2.2925,Paguma_larvata:10.4925)n166:1.7075,Arctictis_binturong:12.2)n165:3)n163:2.8,Arctogalidia_trivirgata:18)n162:6.299999)n152:9.400002)n120:6.608395,((((Panthera_tigris:6.4,(Panthera_pardus:4.45,(Panthera_leo:2.225,Panthera_onca:2.225)n174:2.225)n173:1.95)n172:2.8,Neofelis_nebulosa:9.2)n171:6.1,(((((((Felis_chaus:4.4,(Felis_nigripes:3.998333,(Felis_margarita:3.596667,Felis_silvestris:3.596667)n183:0.401666)n182:0.401667)n181:5.198333,((Prionailurus_rubiginosus:7.096667,(Prionailurus_viverrinus:4.646667,Prionailurus_bengalensis:4.646667)n186:2.45)n185:1.250833,Otocolobus_manul:8.3475)n184:1.250834)n180:1.250834,((Puma_yagouaroundi:3.616389,Puma_concolor:3.616389)n188:3.616389,Acinonyx_jubatus:7.232778)n187:3.616389)n179:1.250833,(Lynx_rufus:5.613333,(Lynx_canadensis:3.15,(Lynx_pardinus:1.575,Lynx_lynx:1.575)n191:1.575)n190:2.463333)n189:6.486667)n178:1.099999,(Leopardus_wiedii:4.671145,Leopardus_pardalis:4.671145)n192:8.528854)n177:0.400001,(Leptailurus_serval:8.85,(Profelis_aurata:5.626667,Caracal_caracal:5.626667)n194:3.223333)n193:4.75)n176:0.4,(Pardofelis_marmorata:11,Catopuma_temminckii:11)n195:3)n175:1.3)n170:12.504199,(Prionodon_linsang:9.266667,Prionodon_pardicolor:9.266667)n196:18.537533)n169:12.504196)n119:6.608393,Nandinia_binotata:46.916786)n118:17.983215)n1:1;')
+
+# If you are getting a "+" down the bottom in your console, just try and re-run the above line so you cancel what it's trying to do. Run the below code instead.
+
+
+final.tree <- ape::read.tree(file = "2. Results/1. First_Phylogeny/1. Median_Newick_Tree_Body-Mass.txt") # the above newick string wasn't working, so I worked around this by just referencing the produced text file from my tree building script
+
+plot(final.tree)
+
+# Note that we only have 199 species now. What are the missing species? Don't spend too long on this, we can work this out moreso below!
+
+```
+
+
+#### 2a. Transforming Tree under different Evolutionary Scenarios
+
+The tree you made is actually considered a Brownian Motion tree, which tends to be the Null Tree when testing hypotheses of trait evolution under different evolutionary scenarios. This phylogeny can be transformed so that the branch lengths are different relative to the type of evolution that may have occurred for your trait.
+
+Some types of evolution are:
+
+ - Brownian Motion -> random drift for values of the trait
+ - Brownian Motion with Pagel's Lambda -> can be bounded or unbounded, and is best considered as whether the trait moves towards a Brownian Motion state (at 1), an independent state where the species trait values are not influenced by the phylogeny (at 0), or disruptive evolution (at -1) where the trait is widely varied and likely to cause speciation across multiple generations.
+ - Brownian Motion with Grafen's Rho -> whether the trait evolved recently over time or more gradually over time
+ - Ornstein-Uhlenbeck -> selection of the trait values to an optimal value
+
+
+This can get complicated, but for now we won't visualise these types of transformations because they actually aren't informative when you plot your tree with your trait. You might incorporate these types of tree branch transformations into things like Phylogenetic Generalised Least Squares (PGLS) analyses, or if you are doing a Biogeographical study which tests different evolutionary hypotheses or assesses endemism of related species. Here, we are only plotting the Brownian Motion version of the phylogeny.
+
+To read more, see:
+
+ - https://www.k-state.edu/biology/p2e/the-evolution-of-quantitative-traits.html
+
+ - https://lukejharmon.github.io/pcm/chapter6_beyondbm/
+
+By no means are the above exhaustive, but they are useful for helping you start somewhere.
+
+
+# 3. Species Names List from "1. Median_Tree-PGLS_Propagation-Distance.rmd"
+
+These are your species names from the first script we worked on. You can re-read these in, or if you are continuing your workflow in the same session you can ignore this code chunk.
+
+```{r 3. Species Names List}
+
+# manual example:
+#taxa<-c("Galidia_elegans",
+#        "Conepatus_humboldtii",
+#        "Lobodon_carcinophaga")
+
+
+taxa <- c(carnivora_list$Species_genus)
+
+```
+
+
+# 4. Fitting fastANC() function to estimate node values from tip values
+
+Here we are reading in our trait data set again, and making the trait accessible for the phylogenetic object, so that both can be plotted at the same time in our pretty graph at the end.
+
+#### 4a. Read Trait Data
+
+```{r 4a. Read Trait Data}
+
+# Re-reading in the original data object so the below dataframes are correct
+body_mass_data <- read.csv("1. Data/2. Datasets/2022-11-07_Phylo-Tree_BM-data.csv") # using ", row.names=4" gives you species row names
+
+# Lets add the resolved names to our species dataset.
+
+body_mass_data$Updated_Species_genus <- gsub(" ", 
+                                      "_",
+                                      resolved_names$unique_name)
+
+
+# We allocate the new species labels as the row name. This helps the tree figure out where the trait data is.
+
+rownames(body_mass_data) <- body_mass_data[,9]
+
+
+# Here is where we need to know which species had been removed in our previous script. Otherwise, the next step will not work. We need 199 to correspond with the 199 in our tree.
+
+#A way to check is:
+  
+check_spp_tree <- as_tibble(final.tree[["tip.label"]])
+
+full_list_spp_check <- as_tibble(body_mass_data$Updated_Species_genus)
+
+# You can open these and manually compare the lists. I don't have code to automatically do this, but I'm sure it is out there!
+# Luckily, I've manually done this for us!
+
+
+# Now lets remove them from out body_mass_data object. We do this using the row number.
+
+# The missing species are:
+
+#Aonyx_cinereus = row 172 -> Aonyx_cinerea
+body_mass_data <- body_mass_data[-172,]
+
+#Neomonachus_schauinslandi = row 83 - > Monachus_schauinslandi
+body_mass_data <- body_mass_data[-83,]
+
+#Neomonachus_tropicalis = row 84 -> Monachus_tropicalis
+body_mass_data <- body_mass_data[-84,]
+
+#Panthera_uncia = row 184 -> Uncia_uncia
+body_mass_data <- body_mass_data[-184,]
+
+#Urva_edwardsii = row 72 -> Herpestes_edwardsi
+body_mass_data <- body_mass_data[-72,]
+
+
+# Now lets take the correct species trait values for the correct species list!
+body_mass_variable <- as.data.frame(body_mass_data)[,5] # check the column is correct -> this is used for fastANC()
+
+
+```
+
+
+#### 4b. Calculate the Ancestral State Reconstruction using fastANC()
+
+Here we are fitting the trait onto a fast ancestral state reconstruction, which takes the species values at the tips, then induces the value that should be at each node of the tree (the bits where the tree changes or splits from other branches). 
+
+This code won't work if your species labels from your trait data set and your tree labels don't align. We have fixed this above. 
+
+The other thing to remember is that if you re-run this again, the fit object ends up adding values to the object, instead of re-write the object. I would suggest starting from scratch if this happens to you.
+
+```{r 4b. fastANC() calculation}
+
+# you need to not confuse the fastAnc -> it can only find the data it needs in the first column, and this is why we have it in a single numeric list
+
+fit <- fastAnc(final.tree, body_mass_variable, vars=TRUE,  CI=TRUE, method="BM") # this is your fast ancestral state reconstruction!
+
+fit$ace # checking that how many nodes are in the fit object
+
+names(body_mass_variable) <- rownames(body_mass_data) # aligning your variable object with your initial data object. This is required for later
+
+```
+
+
+#### 4c. Comparison of Fitted to Real values
+
+Here we are plotting what the fastAnc() function did with our trait data and what those values look like. This is just an examination of how good the fastAnc() was, but we don't really need it for the rest of the workflow.
+
+```{r 4c. Comparison of Fitted to Real values}
+
+## simulate with ancestral states
+x<-fastBM(final.tree,internal=TRUE) # brownian motion scenario
+## ancestral states
+a<-x[as.character(1:final.tree$Nnode+Ntip(final.tree))] # gives you same dataframe as below
+## tip data
+x<-x[final.tree$tip.label]
+
+
+plot(a,fit$ace,xlab="true states",ylab="estimated states",bg="grey",cex=1.4,
+    pch=21)
+lines(range(c(x,a)),range(c(x,a)),lty="dashed",col="red") ## 1:1 line
+
+```
+
+
+# 5. Making two dataframes for Trait Tree
+
+What we are now doing is calculating the trait values in the nodes using the fastANC() function, and then you are combining this with the values at the tips in your original data set. 
+
+
+This then means you should have, for instance:
+
+199 tips and 196 internal nodes. -> You can find this number from your Newick String object
+
+
+To check things, you should have:
+
+- body_mass_variable = 199 tips
+- fit$ace = 196 nodes
+
+See how the numbers align with how many bits are in your final.tree object? This is how we know we are on the right track.
+
+
+For the code chunks below, you must use your original rooted tree, otherwise the node ID's are not going to be present.
+
+
+Some resources:
+
+This link helps you understand some of what is happening in the fit object. 
+https://wiki.duke.edu/display/AnthroTree/4.2+Confidence+intervals+on+maximum+likelihood+reconstructions+in+R
+
+
+#### 5a. Make Trait Dataframe
+
+Here we are taking the tree, the trait values, and the names and making them into two dataframes - one for the tips and one for the nodes.
+
+```{r 5a. Make Trait Dataframe}
+
+trait.dataframe <- data.frame(node = nodeid(final.tree, names(body_mass_variable)),
+                 trait = body_mass_variable) # the names option needs the rows as the species label
+
+
+str(trait.dataframe$trait)
+trait.dataframe$trait <- as.numeric(trait.dataframe$trait)
+
+
+str(trait.dataframe$node)
+trait.dataframe$node <- as.numeric(trait.dataframe$node)
+
+```
+
+
+#### 5b. Make Node Dataframe
+
+Here we are putting the node values from the fit object into the node dataframe and combining them with the trait dataframe.
+
+```{r 5b. Make Node Dataframe}
+
+node.dataframe <- data.frame(node = names(fit$ace), trait = fit$ace) 
+str(node.dataframe$trait)
+node.dataframe$trait <- as.numeric(node.dataframe$trait)
+
+str(node.dataframe$node)
+node.dataframe$node <- as.numeric(node.dataframe$node)
+
+
+
+combined.traitANDtree.dataframe <- rbind(trait.dataframe, node.dataframe)
+combined.traitANDtree.dataframe$node <- as.numeric(combined.traitANDtree.dataframe$node)
+
+```
+
+
+#### 5c. Join Trait w/ Node into Combined Dataframe
+
+Here we are combining our original tree that had branch lengths, with the tree and node dataframe.
+
+```{r 5c. Join Trait w/ Node into Combined Dataframe}
+
+trait.treeWITH.BRANCHES <- full_join(final.tree, combined.traitANDtree.dataframe, by = 'node')
+
+trait.treeWITH.BRANCHES 
+
+# notice how there are NA values in the trait column. We will fix this in the next steps.
+
+```
+
+
+#### 5d. Make Combined Dataframe into an Object
+
+Here we are making sure that there is another object called "trait" which can be used in the pretty graph later on. We are also making sure there are no NA values in the trait object, so we remove those rows.
+
+```{r 5d. Make Combined Dataframe into an Object}
+
+# Getting the trait data into it's own object #
+trait.treeWITH.BRANCHES@data[["trait"]] <- as.numeric(trait.treeWITH.BRANCHES@data[["trait"]])
+
+trait <- trait.treeWITH.BRANCHES@data$trait 
+trait
+
+# Notice how you have two NA's which were introduced into the dataframe. They are at rows 9 and 54. For the moment we will remove them to make the pretty tree works, but generally this is related to the fact the trait value is essentially zero from your original body_mass data set. That means the fastAnc() can't really work out what's happening with that trait value for that particular species.
+
+trait <- trait[-9] # We removed the NA value introduced when the full_join() was applied. Using the row number means that the nodes and tips will be ordered correctly with regards to the species label.
+trait <- trait[-54]
+
+trait
+
+```
+
+
+#### 5e. Remove Underscores from Tree
+
+This code is very important. By removing the underscores from the tree, you allow the tree object to find the data you labelled in your trait data set, and this means they can be aligned. If the species names (and even the ways the species names are written) do not align, this trait data cannot be mapped onto the tree. 
+
+```{r 5e. Remove Underscores from Tree}
+
+# do this after reading in the "trait" object, not before this
+final.tree<-read.tree(text=write.tree(final.tree))
+final.tree$tip.label <- strip_ott_ids(final.tree$tip.label, remove_underscores = TRUE) # great code to take away the OTTid in the name, and remove the underscore
+
+```
+
+
+# 6.Plotting Traits on Tree
+
+Now we've come to the pretty tree stage! YAY!
+
+What we need to do is:
+ 
+ - use the correct trait dataframe here
+ - use the correct tip labels/edge.lengths
+ - make sure the correct number of species is included (checked by specifying ylim())
+ - make sure no NA's are in the trait object
+ - choose our colour gradients!
+ 
+ 
+Luckily all this lovely code below works with the phylogenetic tree we have made!
+
+Here is a nice website to make the colour gradients you want for your continuous trait data. We want to choose colours which are informative and make sense. I want you to go onto this website and choose your own gradients. Our aim is to make sure you can understand what colours look nice on this phylogenetic tree too!
+
+Source for nice gradients;
+ - https://uigradients.com/#KingYna 
+ 
+Link to HTML Colour codes so you can choose your own colours:
+ - https://htmlcolorcodes.com/color-picker/
+ 
+To change the colours, use the scale_color_gradient2() function and specify a low, mid, and high colour. If your trait is on a different scale, you need to change the midpoint too.
+
+```{r 6.Plotting Traits on Tree}
+
+p <- ggtree(final.tree, mrsd = final.tree$edge.lengths, 
+                            aes(color=trait), 
+                            ladderize = F, size=rel(0.8)) # size = rel (0.4) is hard to see colours
+p1 = revts(p)
+p2 <- p1 +
+  
+  scale_color_gradient2(low = c('#1a2a6c'), #for gradients, get colours that make nice mix in middle, but still have good contrast
+                       mid = c('#b21f1f'), # choose mid point based on scale produced
+                       high = c('#fdbb2d'),
+                       midpoint = 1)+  # choose mid point based on scale produced
+  theme_tree2(plot.margin=margin(6, 120, 6, 6)) + 
+  theme(legend.position = c(0.18,0.14)) + # need to move legend to it doesn't cover the branches
+  labs(col = "Log10 (Body Mass) \n(kg)")+
+  guides(colour = guide_colourbar(title.position="top", title.hjust = 0.5),
+         override.aes = list(size = rel(10))) +
+  theme(legend.title = element_text(face = "bold", 
+                                    hjust = 0.5, 
+                                    size = rel(1.1)),
+        legend.title.align = 0.5,
+        legend.direction="horizontal",
+        legend.key = element_rect(fill = "white", colour = "black"),
+        legend.key.size = unit(rel(0.9), 'cm'))+ # change this to change the size of the coloured bar for the legend
+  geom_tiplab(size = rel(1.65), # rel(2.55) is good for smaller trees, but we're making a big tree so we need to reduce the size of the tip labels
+              fontface = "italic",
+              parse=F) + 
+  geom_rootedge() +
+  labs(caption = "Divergence time - MYBP") +
+  coord_cartesian(clip = 'off')+
+  theme(plot.caption = element_text(hjust = 0.5, size = rel(1.2)),
+        axis.title.y=element_blank(), 
+        axis.text.y=element_blank(), 
+        axis.ticks.y=element_blank()) +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +   
+  ylim(0,200) + # be careful of this -> set to the number of species you have plus 1. This is needed because it gives you the spacing between the tree and the scale
+  vexpand(-.2)
+
+p2
+
+```
+
+
+# 7. Saving Tree Object
+
+Here we are saving the tree object into a .png file since it vectorises nicely for publication-quality figures.
+
+```{r 7. Saving Tree Object}
+
+aspect_ratio <- 2.5 # we need this to keep the tree spaced correctly
+
+
+ggsave("2. Results/1. First_Phylogeny/1. Median-Tree_TRAIT-PREDICTED_BM.png", plot = p2, width = 7 , height = 4.5 * aspect_ratio)
+
+```
+
+
+# 8. Files Names
+
+Here I keep the file names I am using for multiple trees, so if I make more trees using this code, or produce trees with different branch transformations, I replace the file name above with the correct name from below.
+
+```{r 8. Files Names}
+
+# NAME OF FILES:
+# 1. Median-Tree_TRAIT-PREDICTED_BM.png # Brownian Motion scenario, with Brownian Motion FastANC() calculation
+
+```
+
+
+# z. More resource and other things for different types of trees:
+
+If you have breezed through this workshop, I would recommend three things:
+
+  1. Try to make a tree based only on one Family in your data set. 
+  2. Try to make a tree based on a different trait in your data set - either Litter Size or Log Litter Size.
+  
+  (ADVANCED)
+  
+  3. Try and change the layout of the tree so that the pretty graph looks different but equally as pretty!
+
+Good luck!
+
+
+In addition, we only made one type of tree here, but using ggtree and other packages, you can make many different types! I would suggest looking at the below links to see other version and then I would suggest you try them with the code from our workshop.
+
+  - https://guangchuangyu.github.io/ggtree-book/chapter-ggtree.html
+  - http://blog.phytools.org/

@@ -1,0 +1,492 @@
+---
+title: "1. Median_Tree_Body-Mass"
+author: "Ben JJ Walker"
+date: "07/11/2022"
+output:
+  html_document: default
+editor_options: 
+  chunk_output_type: console
+---
+
+# 1. Packages to Read:
+
+These are all the packages we need to read in so that our script works. Some of them are developer versions, so I've included the code to find them from the developers. 
+
+```{r 1. Packages, message=FALSE, warning=FALSE, results=FALSE}
+
+# Data Manipulation Packages
+library(devtools)
+library(dplyr)
+library(stringr)
+
+# Phylogenetic Tree Packages
+#devtools::install_github("phylotastic/datelife")
+library(datelife)
+library(rotl)
+
+#library(ape)
+
+```
+
+Use this script with a list of species that you are interested in to get a phylogenetic tree of how those species are related to each other through time. Technically, this is an tree with induced median tree branch lengths. In this script we produce a newick string, which is your phylogenetic tree in a character string format that readily understood by many different software.
+
+NB**: The important line of code that generates the induced tree can only run on a Mac computer. I think this is because the package devs. built it using a Mac, but did not test this using Windows. I don't entirely understand why it does not run on a Windows computer.
+
+However, until you get to that point in your script, run this entire script because we need this code for the second part of this workshop.
+
+To overcome this issue for our workshop, I have generated a newick string using our species list, which is found in the Results file you've downloaded, so you can make the pretty trees later on.
+
+
+# 0. Getting Species Data from EOL, GBIF, ALA, etc.
+
+The Encyclopedia of Life (EOL) is a great place to start when you want many different ecological traits for your species of interest. Unfortunately, the way the online database is organised and maintained is not easily accessible for us R users. That said, to get that data manually, I suggest going onto their website, making an account, and then using this search function in their TraitBank:
+
+- https://eol.org/terms/search_results?tq%5Bf%5D%5B0%5D%5Bp%5D=2563&tq%5Br%5D=taxa
+
+to get a .tsv file that only has the number of entries per species.  This manual query can take a little bit of time to figure out, and then you do need to manually create your data set and clean the data. The good thing about saving the search query is that you can come back to the same search when you are manually doing things later.
+
+I don't really like how they don't allow you to scrape the data from their website easily, and I can't really find any R package that can do this for us, but I put this here so you can see an example of an online Trait Bank with known species records that sit inside and work with other online web-services like the GBIF.
+
+
+Luckily, for our workshop I've bypassed this step and made a data set for you to work with. I have based this off all Carnivora in the PanTHERIA database that have both body masses and litter sizes; 
+- https://esajournals.onlinelibrary.wiley.com/doi/10.1890/08-1494.1
+
+I have transformed the data using log transformations because they will make our lives easier later on. We can read in this data and use it to get our taxa list, and our species trait. 
+
+```{r 0. Getting Species Data}
+
+carnivora_list <- read.csv("1. Data/2. Datasets/2022-11-07_Phylo-Tree_BM-data.csv")
+
+```
+
+
+# 2. Species Names List
+
+This can be done manually here on R, or it can be read in from your .csv above. 
+
+```{r 2. Species Names List}
+
+# manual example:
+#taxa<-c("Galidia_elegans",
+#        "Conepatus_humboldtii",
+#        "Lobodon_carcinophaga")
+
+
+taxa <- c(carnivora_list$Species_genus)
+
+
+```
+
+
+# 3. Species OTT-id List
+
+The speces OTT-id is like a DOI for the species name. I generally go to the OToL website below:
+
+- https://tree.opentreeoflife.org/taxonomy/browse?name=  
+
+and I manually pull out the OTT-id for each species to put into my initial .csv file. I have done this for you here, but if you want you can try using the tnrs_match_names() function differently to try and sort this for you in an unsupervised way.
+
+Doing this manually saves you from having to change things later, and this can be really confusing if the OTT-id and the Taxa name does not match for your species of interest. I personally think doing this in a supervised way (i.e., manually) ensures you do not have mistakes in the future, especially with species that may have contested identities - for example the Dingo - which is known as "Canis dingo" or "Canis familiaris dingo" depending on which side of the taxonomic debate you sit.
+
+```{r 3. Species OTT-id List}
+
+# manual example:
+#ids<-c("86159",
+#       "3613131",
+#       "492021")
+
+ids <- as.character(carnivora_list$OTTid)
+
+```
+
+
+# 4. Comparison of Taxa name and OTT-id listing
+
+This function creates an object that assesses the taxa you have, and the OTTids you have, and then pulls out the species and likely synonyms. It basically tells you things are okay or not okay. 
+
+```{r 4. Comparison of Taxa name and OTT-id listing}
+
+resolved_names <- rotl::tnrs_match_names(names = taxa, id = ids, context_name = "Animals", include_suppressed = T) 
+
+```
+
+
+#### 4a. Checking List, and fixing OTT-Ids
+
+If things are not okay, you need to update specific species in your resolved_names object. Below in the chunks are some ways you can do this.
+
+Open this website to find OTTids for each species you need:
+
+- https://tree.opentreeoflife.org/taxonomy/browse?name=  
+
+You can search your species here manually to find tonnes of information about its taxonomic classification. This is a really great resource to find out if you are using synonyms or if your OTTid is leading to an incorrect species name.
+
+Once you have checked the above resolved_names object by opening it, see if you can identify the 8 species which have had either their OTTid changed or their species name changed. I will give you the first two to help you!
+
+```{r 4a. Checking List, and fixing OTT-Ids}
+# Once checked, look at each name specifically - then change the OTTid or change the species name if it was incorrectly matched.
+
+
+#ones to fix - FOR EXAMPLE: 
+
+#Panthera_pardius = Panthera_pardus, ottid = 42324
+#Pagophilus_groenlandicus = Phoca groenlandica = 664062
+
+
+# Here we are inspecting the eight unresolved names (I suggest you copy this code for the other species OTTids):
+inspect(resolved_names,ott_id = "664062") #Pagophilus_groenlandicus = Phoca groenlandica = 664062
+
+
+
+# This species has a few options. As an exercise, this next line of code shows you how to change the OTTid so that you have the correct species identifier, regardless of the species name. In this example it is INCORRECT when I do this change, so I am changing it back later on.
+
+# Pagophilus_groenlandicus = Phoca groenlandica = 664062
+# Helophilus groenlandicus = 4354512
+
+
+# Replace "incorrect" Phoca groenlandica
+resolved_names <- update(resolved_names,
+                        ott_id = "664062",
+                        new_ott_id = "4354512")
+
+
+# The blow code is another way of replacing the OTTid, so I am using the row number instead to change our list back to the correct version.
+
+resolved_names <- update(resolved_names,
+                        row_number = 136,
+                        new_ott_id = "664062")
+
+
+# Save your new unique species list!
+
+# Update your original carnivora_list object with the new species names:
+
+# First, replace the space in the name with an underscore - you need this underscore for code later on.
+
+carnivora_list$Updated_Species_genus <- gsub(" ", 
+                                      "_",
+                                      resolved_names$unique_name)
+
+# Update your taxa list with the new species names
+taxa <- c(carnivora_list$Species_genus)
+
+```
+
+
+At this point its a little hard to know what the correct species were, but by adding them to your data set as a new column, we can check the old names and the new names. We can then replace them more easily.
+
+
+```{r Fixing All changed species names to correct OTTids}
+
+# Incorrect Changes are shown in the comment, and the code is the fix:
+
+# Felis_nigripes to Actina_chalybea
+resolved_names <- update(resolved_names,
+                        row_number = 61,
+                        new_ott_id = "983179")
+
+# Ursus_americanus to Grus_americana
+resolved_names <- update(resolved_names,
+                        row_number = 187,
+                        new_ott_id = "872577")
+
+# Felis_margarita to Margarites_helicinus
+resolved_names <- update(resolved_names,
+                        row_number = 60,
+                        new_ott_id = "983177")
+
+# Monachus_schauinslandi to Neomonachus_schauinslandi
+resolved_names <- update(resolved_names,
+                        row_number = 83,
+                        new_ott_id = "180367")
+
+# Monachus_tropicalis to Neomonachus_tropicalis
+resolved_names <- update(resolved_names,
+                        row_number = 84,
+                        new_ott_id = "3612943")
+
+# Eumetopias_jubatus to Neophoca_cinerea
+resolved_names <- update(resolved_names,
+                        row_number = 32,
+                        new_ott_id = "949686")
+
+# Arctocephalus_australis to Neophoca_cinerea
+resolved_names <- update(resolved_names,
+                        row_number = 174,
+                        new_ott_id = "796568")
+
+# Genetta_piscivora to Osbornictis_piscivora
+resolved_names <- update(resolved_names,
+                        row_number = 31,
+                        new_ott_id = "49904")
+
+#Otaria_flavescens to Otaria_byronia
+resolved_names <- update(resolved_names,
+                        row_number = 134,
+                        new_ott_id = "273182")
+
+#Felis_manul to Otocolobus_manul
+resolved_names <- update(resolved_names,
+                        row_number = 59,
+                        new_ott_id = "86183")
+
+#Panthera_pardius to Panthera_pardus
+resolved_names <- update(resolved_names,
+                        row_number = 17,
+                        new_ott_id = "42324")
+
+#Uncia_uncia to Panthera_uncia
+resolved_names <- update(resolved_names,
+                        row_number = 184,
+                        new_ott_id = "532117")
+
+
+#Histriophoca_fasciata to Phoca_fasciata
+resolved_names <- update(resolved_names,
+                        row_number = 73,
+                        new_ott_id = "664065")
+
+#Pagophilus_groenlandicus to Phoca_groenlandica
+resolved_names <- update(resolved_names,
+                        row_number = 136,
+                        new_ott_id = "664062")
+
+#Herpestes_edwardsi to Urva_edwardsii
+resolved_names <- update(resolved_names,
+                        row_number = 72,
+                        new_ott_id = "5835568")
+
+#Herpestes_javanicus to Urva_javanica
+resolved_names <- update(resolved_names,
+                        row_number = 65,
+                        new_ott_id = "815154")
+
+
+# Hyaena_brunnea to Zygaena_loti
+resolved_names <- update(resolved_names,
+                        row_number = 74,
+                        new_ott_id = "742313")
+
+
+# Let's save this again
+carnivora_list$Updated_Species_genus <- gsub(" ", 
+                                      "_",
+                                      resolved_names$unique_name)
+
+# Update your taxa list with the new species names
+taxa <- c(carnivora_list$Species_genus)
+
+
+```
+
+
+
+
+#### 4b. Checking if spp. in OToL Tree
+
+Here we are making sure our nice new list actually OCCURS in the Open Tree of Life. 
+
+Sometimes you find OTTids using rotl that are missing from an induced subtree. This happens because the taxa is not found IN the synthetic super tree that the OToL maintain. This is because either the taxa is incorrect/invalid, or the taxa is part of a group which is not monophyletic in the overall synthetic tree.
+
+There are two ways you can deal with this.
+
+1. remove the taxa which is not part of the OToL
+2. Use the complete species name.
+
+```{r 4b. Checking if spp. in OToL Tree}
+
+in_tree <- is_in_tree(ott_id(resolved_names)) # We are checking if species with resolved names are in the tree
+in_tree
+
+# Yay! They are there! If they were not, then this would read FALSE instead of TRUE.
+
+
+# Below, we are making the tree we need without branch lengths, based on how OToL connects their tree branches. This gives us a monophyletic tree, where we delete the paraphyletic species (i.e. the species where polytomies are unresolved - which means we don't know where the species at the tip diverges from its nearest relative). Polytomies generally occur at the "Species genus" level.
+
+tr <- tol_induced_subtree(ott_id(resolved_names)[in_tree]) # this includes only those species which are monophyletic -> going to lowest classification guarantees they won't be paraphyletic. If we want, we can then specify ", file = T" to get a newick string which has no branch lengths.
+
+# Did we lose species? What were they? Don't worry about them here, because we don't need them, but I would troubleshoot this in a proper analysis.
+
+```
+
+
+# 5. Finding Source Chronograms based on SPP. List
+
+The below "hits" object is important because it contains source tree branch lengths for all associated species relationships in our Taxa list. We need this to then find the median branch lengths to make our tree.
+
+```{r 5. Finding Source Chronograms based on SPP. List}
+
+studies_find_trees(property = "ot:ottId", value = as.character(ott_id(resolved_names)[1])) # this code uses the OTTids to find trees containing the first species -> this only does the first spp. because we specified it using a Boolean operator (the square brackets with a 1 in it). This is not required, but shows you what the function does.
+
+
+hits <- lapply(resolved_names$ott_id, studies_find_trees, property = "ot:ottId", detailed = FALSE)
+sapply(hits, function(x) sum(x[["n_matched_trees"]])) # these two lines of code find all trees for all species in our analysis. Usually you would note which species do not have any trees, and remove them from further analysis.
+
+
+hits[in_tree] # shows which spp do not have trees included in OToL.
+
+in_tree[17] # Panthera pardus does have source trees in OToL
+hits[[17]] # There are multiple studies with multiple trees for Panthera pardus
+
+
+```
+
+
+#### 6. Resolving Tree to get relationships from Sources and Taxa List Input
+
+Here we are getting the trees from the listed studies, and putting them into one object. We are then taking this object and making an induced tree with source trees that have branch lengths.
+
+
+```{r 6. Resolving Tree to get relationships}
+#### All trees used to get median branch values should be in the supplementary information or referenced in your study.
+
+ott_in_tree <- ott_id(resolved_names)[is_in_tree(ott_id(resolved_names))] # Make an object with OTTid species that are in the Synthetic tree and which have source tree branch lengths.
+
+
+tr <- tol_induced_subtree(ott_ids = ott_in_tree) # Updating our tree so that it has all the information we need. Ignore the warning.
+
+
+tr$tip.label <- strip_ott_ids(tr$tip.label, remove_underscores = TRUE) # This is great code to take away the OTTid in the name, and remove the underscores from the species label
+
+plot(tr) # You have a tree! But it doesn't have the correct branch lengths yet.
+
+```
+
+
+# 7. Summarising Tree Branch Lengths into Matrices
+
+This code calls datelife, which is a way to see what the tree branches actually are from your "tr" object. This is really important code, and is built off the phylotastic project I spoke about in my lecture slides. Those tree branches go into matrices, which means they can be read by R.
+
+```{r 7. Summarising Tree Branch Lengths into Matrices}
+
+tr_dr <- datelife::get_datelife_result(tr, use_tnrs = FALSE) # this worked because of the tip label removal code above ! This is why the underscore removal code is important.
+
+# Sometimes, this step will change your list of species to a different list if it is automatically using the Taxanomic Names Resolution Service from Datelife. This can be really annoying after all the work you did above, so I would HIGHLY RECOMMEND turning this off using ", use_tnrs = FALSE". We already did this TNRS step, we don't need the TNRS again.
+
+```
+
+
+#### 7a. Summarising all your source tree references
+
+Here is code that saves your source trees so you can reference them later.
+
+```{r 7a. Summarising all your source tree references}
+
+# get all the original phylogenies to reference:
+tr_phylo_all <-  datelife::summarize_datelife_result(tr_dr, summary_format = "phylo_all")
+
+# We want to note which taxa were missing from source chronograms. In this case, none were missing.
+
+#Input taxa completely absent from source chronograms:
+# none
+
+```
+
+
+# 8. Working out Median Tree Branch Lengths from Matrices
+
+The below code summarises the median branch lengths from all the phylogenies you found above. This is where you get your tree for further use in analysis or in plotting.
+
+Sometimes, these functions have nested functions, so something like TNRS is nested and automatically called in the umbrella function from e.g. datelife_query. If you need it off, you need to specify this using the correct options, and correctly know the pathway that that function takes when being called. 
+
+This helps you figure out how the package actually works. Datelife_query isn't required for later functions as a result, even though it shows a warning that the option is missing.
+
+
+****
+These chunks below are the money chunks, and if you are NOT on Mac, I do not think they will work for you. Here is where you move to the next script, and read in the tree I made for you.
+
+
+#### 8a. Newick String to read into Analyses - RESULT OUTPUT
+
+This is your important line of code. This can take some time to run.
+
+```{r 8a. Newick String to read into Analyses}
+
+tr_newick_median <-  datelife::summarize_datelife_result(tr_dr, summary_format = "newick_median") # only works on mac
+
+# You will likely get this error code on Windows:
+# Error: call to 'phylocom' failed with status -1073740940
+
+# As you can see, this is really annoying and not clearly defined in error reporting, so try not to get too annoyed at this.
+
+# windows phylocom error: https://github.com/ropensci/phylocomr/issues/16 
+
+write(tr_newick_median, file="2. Results/1. First_Phylogeny/1. Median_Newick_Tree_Body-Mass.txt")
+
+```
+
+
+#### 8b. Phylo Object for use in R-Studio
+
+Another output we can make is creating a Phylo object that stays in R, but which can be used for later stuff like plotting the pretty picture. Again this gives you an error if you are NOT on Mac. 
+
+This works on Mac only. This can take some time to run.
+
+```{r 8b. Phylo Object for use in R-Studio}
+
+tr_phylo_median <-  datelife::summarize_datelife_result(tr_dr, summary_format = "phylo_median") # only works on mac
+
+tr_phylo_median
+
+# You will likely get this error code on Windows:
+# Error: call to 'phylocom' failed with status -1073740940
+
+# As you can see, this is really annoying and not clearly defined in error reporting, so try not to get too annoyed at this.
+
+# windows phylocom error: https://github.com/ropensci/phylocomr/issues/16
+
+# You cannot write this object straight to a text file because its in a dataframe, rather than a categorical string (like the newick string code above).
+
+plot(tr_phylo_median)
+
+```
+
+
+# 9. Tree Plot with Time Scale
+
+This is an example of taking the above phylo object and plotting something with it.
+
+If you get an error, try changing your chunk outputs to "Chunk Output in Console".
+
+```{r 9. Tree Plot with Time Scale}
+
+# plot the median tree from above
+ape::plot.phylo(tr_phylo_median, cex = 1.2)
+# Add the time axis:
+ape::axisPhylo()
+# And a little hack to add the axis name:
+graphics::mtext("Time (myrs)", side = 1, line = 2, at = max(get("last_plot.phylo",envir = .PlotPhyloEnv)$xx) * 0.5)
+
+```
+
+
+# z. Other Outputs/Ways to summarise Tree_Datelife-Result List of Matrices (which give branch lengths)
+
+This is another output you can get from datelife, which uses another calculation to work out the branch lengths instead of the median. This is called the Super Distance Matrix, and I don't really understand it, but the method is from Criscuolo et al. 2006.
+
+Again, this only works on Mac. This takes a long time to run.
+
+```{r Newick SDM supertree method (Criscuolo et al. 2006)}
+
+tr_newick_sdm <-  datelife::summarize_datelife_result(tr_dr, summary_format = "newick_sdm") # only works on mac
+tr_newick_sdm
+
+
+write(tr_newick_sdm, file="2. Results/1. First_Phylogeny/2. SDM_Newick_Tree_Body-Mass.txt")
+
+```
+
+This is another useful output, where you work out the values of the most recent common ancestor for your species list. This would be at the nodes of your tree - i.e., those bits where your tree splits its branches.
+
+Again, this only works on Mac.
+
+```{r Most Recent Common Ancestor}
+
+tr_mrca <-  datelife::summarize_datelife_result(tr_dr, 
+                                                summary_format = "mrca") # only works on mac
+tr_mrca
+
+write(tr_mrca, file="2. Results/1. First_Phylogeny/3. MRCA_Newick_Tree_Body-Mass.txt")
+
+```
+
